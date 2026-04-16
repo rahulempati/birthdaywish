@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Bhandavya's Birthday Quest</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;1,600&family=Montserrat:wght@300;400;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/TextPlugin.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <style>
+        :root { --accent: #ffd700; --rose: #ff85a2; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+        body { margin: 0; background-color: #050a1f; color: #ffffff; font-family: 'Montserrat', sans-serif; overflow: hidden; height: 100dvh; width: 100vw; display: flex; align-items: center; justify-content: center; position: fixed; }
+        #canvas-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; }
+        .radiant-text { font-family: 'Cormorant Garamond', serif; font-style: italic; background: linear-gradient(to right, #fff, var(--accent), var(--rose), #fff); background-size: 200% auto; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: shine 3s linear infinite; font-weight: 600; }
+        @keyframes shine { to { background-position: 200% center; } }
+        .header-nav { position: fixed; top: 0; width: 100%; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; backdrop-filter: blur(10px); background: rgba(0,0,0,0.2); z-index: 100; }
+        .progress-bar { height: 3px; background: var(--accent); position: absolute; bottom: 0; left: 0; transition: width 0.8s ease; box-shadow: 0 0 10px var(--accent); }
+        .glass-card { background: rgba(255, 255, 255, 0.07); backdrop-filter: blur(25px); border: 1px solid rgba(255, 255, 255, 0.1); display: none; flex-direction: column; align-items: center; justify-content: center; width: 92%; max-width: 380px; border-radius: 2rem; padding: 2rem 1.2rem; text-align: center; box-shadow: 0 30px 60px rgba(0,0,0,0.4); z-index: 10; position: absolute; }
+        .active-card { display: flex; border: 1px solid rgba(255, 215, 0, 0.3); }
+        .btn-primary { background: linear-gradient(135deg, #ffd700 0%, #ff85a2 100%); color: #000; padding: 0.8rem 1.8rem; border-radius: 999px; font-weight: 800; text-transform: uppercase; font-size: 11px; letter-spacing: 1px; margin-top: 1rem; cursor: pointer; border: none; transition: transform 0.2s; }
+        .btn-primary:active { transform: scale(0.95); }
+        .memory-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: 100%; margin: 15px 0; }
+        .m-card { aspect-ratio: 1/1; background: rgba(255,255,255,0.1); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; cursor: pointer; border: 1px solid rgba(255,255,255,0.1); transition: all 0.3s; }
+        .m-card.flipped { background: rgba(255,255,255,0.25); transform: rotateY(180deg); }
+        .m-card.matched { border-color: var(--accent); background: rgba(255,215,0,0.2); pointer-events: none; opacity: 0.8; }
+        #game-area { position: relative; width: 100%; height: 240px; background: rgba(0,0,0,0.3); border-radius: 15px; overflow: hidden; margin: 10px 0; touch-action: none; border: 1px solid rgba(255,255,255,0.1); }
+        #basket { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); font-size: 2.5rem; pointer-events: none; filter: drop-shadow(0 0 10px rgba(255,215,0,0.5)); }
+        .falling-item { position: absolute; font-size: 1.8rem; pointer-events: none; }
+        .scroll-container { max-height: 25dvh; overflow-y: auto; width: 100%; padding: 12px; background: rgba(255,255,255,0.05); border-radius: 1rem; text-align: left; font-size: 0.85rem; line-height: 1.6; border: 1px solid rgba(255,255,255,0.1); }
+    </style>
+</head>
+<body>
+
+    <audio id="bg-music" loop>
+        <source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3" type="audio/mpeg">
+    </audio>
+
+    <header class="header-nav">
+        <span class="text-[9px] font-bold tracking-[3px] uppercase text-white/70">Special Edition</span>
+        <div id="p-bar" class="progress-bar" style="width: 0%"></div>
+    </header>
+
+    <div id="canvas-container"></div>
+
+    <main class="w-full h-full flex items-center justify-center">
+        <div id="step1" class="glass-card active-card">
+            <h1 class="radiant-text text-4xl">Hey Bhandavya!</h1>
+            <p class="mt-2 text-white/60 text-[10px] tracking-widest uppercase">Tap to start your surprise</p>
+            <button onclick="startQuest()" class="btn-primary">Start the Quest</button>
+        </div>
+
+        <div id="step2" class="glass-card">
+            <h1 class="radiant-text text-2xl">Security Check</h1>
+            <p class="text-[9px] text-white/50 tracking-widest uppercase mb-2">Match the pairs to unlock</p>
+            <div id="memory-grid" class="memory-grid"></div>
+            <p id="card-status" class="text-[11px] font-bold text-yellow-400">Found: 0/4</p>
+        </div>
+
+        <div id="step3" class="glass-card">
+            <h1 class="radiant-text text-2xl">Catch the Vibes</h1>
+            <p class="text-[9px] text-white/50 tracking-widest uppercase mb-2">Catch 5 Goodies (Avoid 😤)</p>
+            <div id="game-area">
+                <div id="catcher-score" class="absolute top-2 right-4 font-bold text-yellow-400 text-sm">0/5</div>
+                <div id="basket">🎁</div>
+            </div>
+            <p class="text-[10px] text-white/40 mt-2">Swipe/Drag the box!</p>
+        </div>
+
+        <div id="step4" class="glass-card">
+            <h1 class="radiant-text text-xl mb-2">To Bhandavya,</h1>
+            <div class="scroll-container"><p id="typing-note"></p></div>
+            <button id="btn-final" onclick="nextStep(5, 100)" class="btn-primary opacity-0 pointer-events-none">Final Step</button>
+        </div>
+
+        <div id="step5" class="glass-card">
+            <h1 class="radiant-text text-4xl">Happy Birthday!</h1>
+            <p class="text-yellow-400 font-bold tracking-widest mt-2 uppercase">Bhandavya</p>
+            <div id="tag-final" class="hidden text-lg font-bold text-white my-6 italic">Best wishes to you! 💛</div>
+            <button id="btn-fire" onclick="endGame()" class="btn-primary">Start Fireworks</button>
+        </div>
+    </main>
+
+    <script>
+        gsap.registerPlugin(TextPlugin);
+        
+        const music = document.getElementById('bg-music');
+        music.volume = 0.4;
+
+        function nextStep(s, prog) {
+            document.getElementById('p-bar').style.width = prog + '%';
+            const curr = document.querySelector('.active-card');
+            const next = document.getElementById(`step${s}`);
+            
+            gsap.to(curr, { opacity: 0, scale: 0.9, y: -20, duration: 0.4, onComplete: () => {
+                curr.classList.remove('active-card');
+                next.classList.add('active-card');
+                gsap.fromTo(next, { opacity: 0, scale: 1.1, y: 20 }, { opacity: 1, scale: 1, y: 0, duration: 0.4, onComplete: () => {
+                    if(s === 2) initCards();
+                    if(s === 3) initCatcher();
+                    if(s === 4) startTyping();
+                }});
+            }});
+        }
+
+        function startQuest() { 
+            music.play().catch(e => console.log("Music play blocked by browser"));
+            nextStep(2, 25); 
+        }
+
+        function initCards() {
+            const grid = document.getElementById('memory-grid');
+            if(grid.children.length > 0) return;
+            const items = ['🎂','💖','✨','🍕','🎂','💖','✨','🍕','👑'];
+            let deck = items.sort(() => Math.random() - 0.5);
+            let flipped = [], matches = 0;
+
+            deck.forEach(emoji => {
+                const card = document.createElement('div');
+                card.className = 'm-card';
+                card.dataset.emoji = emoji;
+                card.onclick = () => {
+                    if (flipped.length < 2 && !card.classList.contains('flipped') && !card.classList.contains('matched')) {
+                        card.innerText = emoji;
+                        card.classList.add('flipped');
+                        flipped.push(card);
+
+                        if (emoji === '👑') {
+                            setTimeout(() => {
+                                card.classList.add('matched');
+                                flipped = flipped.filter(c => c !== card);
+                            }, 300);
+                            return;
+                        }
+
+                        if (flipped.length === 2) {
+                            const [c1, c2] = flipped;
+                            if (c1.dataset.emoji === c2.dataset.emoji) {
+                                c1.classList.add('matched');
+                                c2.classList.add('matched');
+                                matches++;
+                                document.getElementById('card-status').innerText = `Found: ${matches}/4`;
+                                flipped = [];
+                                if (matches === 4) setTimeout(() => nextStep(3, 60), 800);
+                            } else {
+                                setTimeout(() => {
+                                    c1.innerText = ''; c1.classList.remove('flipped');
+                                    c2.innerText = ''; c2.classList.remove('flipped');
+                                    flipped = [];
+                                }, 600);
+                            }
+                        }
+                    }
+                };
+                grid.appendChild(card);
+            });
+        }
+
+        function initCatcher() {
+            const area = document.getElementById('game-area');
+            const bkt = document.getElementById('basket');
+            let score = 0, active = true;
+            const move = (e) => {
+                let rect = area.getBoundingClientRect();
+                let clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                let x = clientX - rect.left - 25;
+                bkt.style.left = Math.max(0, Math.min(x, rect.width - 50)) + 'px';
+            };
+            area.addEventListener('mousemove', move);
+            area.addEventListener('touchmove', (e) => { e.preventDefault(); move(e); }, {passive: false});
+            const loop = setInterval(() => {
+                if(score >= 5 || !active) { clearInterval(loop); return; }
+                const item = document.createElement('div');
+                item.className = 'falling-item';
+                const isGood = Math.random() > 0.2;
+                item.innerText = isGood ? ['🎂','💖','🎈','✨'][Math.floor(Math.random()*4)] : '😤';
+                item.style.left = Math.random() * (area.clientWidth - 30) + 'px';
+                item.style.top = '-30px';
+                area.appendChild(item);
+                let pos = -30;
+                const fall = setInterval(() => {
+                    pos += 4; 
+                    item.style.top = pos + 'px';
+                    let iR = item.getBoundingClientRect(), bR = bkt.getBoundingClientRect();
+                    if(iR.bottom >= bR.top + 10 && iR.left < bR.right && iR.right > bR.left) {
+                        isGood ? score++ : score = Math.max(0, score - 1);
+                        document.getElementById('catcher-score').innerText = `${score}/5`;
+                        clearInterval(fall); item.remove();
+                        if(score >= 5) { active = false; setTimeout(() => nextStep(4, 85), 500); }
+                    }
+                    if(pos > 260) { clearInterval(fall); item.remove(); }
+                }, 16);
+            }, 700);
+        }
+
+        function startTyping() {
+            const msg = `Happy birthday, Bhandavya 🎉\n\nI know we haven’t been in touch, and things didn’t really end on the best note last year, but I still remembered today. We used to argue and tease each other a lot, but those moments made everything feel real and memorable in their own way.\n\nI’m not trying to make things awkward—I just genuinely hope you’re doing well and that life is treating you kindly.\n\nWishing you a peaceful, happy year ahead. Take care 🙂`;
+            
+            gsap.to("#typing-note", { 
+                duration: 12, 
+                text: msg, 
+                ease: "none", 
+                onComplete: () => {
+                    gsap.to("#btn-final", { opacity: 1, pointerEvents: "auto", y: 0, duration: 0.5 });
+                }
+            });
+        }
+
+        function endGame() {
+            document.getElementById('btn-fire').style.display = 'none';
+            document.getElementById('tag-final').classList.remove('hidden');
+            let end = Date.now() + 8000;
+            (function frame() {
+                confetti({ particleCount: 4, angle: 60, spread: 55, origin: { x: 0, y: 0.6 }, colors: ['#ffd700', '#ff85a2'] });
+                confetti({ particleCount: 4, angle: 120, spread: 55, origin: { x: 1, y: 0.6 }, colors: ['#ffd700', '#ff85a2'] });
+                if (Date.now() < end) requestAnimationFrame(frame);
+            }());
+        }
+
+        let scene, camera, renderer, parts;
+        function initScene() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+            parts = new THREE.Group(); scene.add(parts);
+            for (let i = 0; i < 60; i++) {
+                const p = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 8), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.4 }));
+                p.position.set((Math.random()-0.5)*40, (Math.random()-0.5)*40, (Math.random()-0.5)*40);
+                parts.add(p);
+            }
+            camera.position.z = 20;
+        }
+        function animate() { requestAnimationFrame(animate); parts.rotation.y += 0.0008; renderer.render(scene, camera); }
+        initScene(); animate();
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
